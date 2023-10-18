@@ -1,0 +1,25 @@
+services:
+  webol:
+    image: ghcr.io/fxqnlr/webol:dev-2
+    container_name: webol
+    restart: no
+    depends_on:
+      - db
+    environment:
+      - RUST_LOG=info,webol=trace
+      - WEBOL_DATABASE_URL=postgres://postgres:postgres@localhost:5432/webol
+      - WEBOL_APIKEY=aaa
+      - WEBOL_SERVERADDR=127.0.0.1:7229
+    network_mode: host
+
+  db:
+    image: postgres
+    container_name: webol-db
+    restart: no
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: webol
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
