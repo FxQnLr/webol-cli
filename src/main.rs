@@ -3,6 +3,7 @@ use config::SETTINGS;
 use error::CliError;
 use requests::{start::start, get::get};
 use reqwest::header::{HeaderMap, HeaderValue};
+use serde::Deserialize;
 
 mod config;
 mod error;
@@ -57,4 +58,9 @@ fn default_headers() -> Result<HeaderMap, CliError> {
 
     Ok(map)
 
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorResponse {
+    error: String
 }

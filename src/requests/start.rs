@@ -1,6 +1,7 @@
+use reqwest::StatusCode;
 use serde::Deserialize;
 
-use crate::{config::SETTINGS, error::CliError, default_headers};
+use crate::{config::SETTINGS, error::CliError, default_headers, ErrorResponse};
 
 pub fn start(id: String) -> Result<(), CliError> {
     let res = reqwest::blocking::Client::new()
@@ -15,13 +16,27 @@ pub fn start(id: String) -> Result<(), CliError> {
             format!(r#"{{"id": "{}"}}"#, id)
         )
         .send()
-        .map_err(CliError::Reqwest)?
-        .text();
+        .map_err(CliError::Reqwest)?;
 
-    let res = serde_json::from_str::<StartResponse>(&res.map_err(CliError::Reqwest)?).map_err(CliError::Serde)?;
+    match res.status() {
+        StatusCode::OK => {
+            let body = serde_json::from_str::<StartResponse>(
+                &res.text().map_err(CliError::Reqwest)?
+            )
+            .map_err(CliError::Serde)?;
 
-    if res.boot {
-        println!("successfully started {}", res.id);
+            if body.boot {
+                println!("successfully started {}", body.id);
+            }
+        },
+        _ => {
+            let body = serde_json::from_str::<ErrorResponse>(
+                &res.text().map_err(CliError::Reqwest)?
+            )
+            .map_err(CliError::Serde)?;
+
+            println!("got error: {}", body.error);
+        }
     }
 
     Ok(())
