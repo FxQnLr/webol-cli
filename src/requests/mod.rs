@@ -1,2 +1,2 @@
 pub mod start;
-pub mod get;
+pub mod device;

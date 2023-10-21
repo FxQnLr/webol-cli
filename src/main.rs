@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use config::SETTINGS;
 use error::CliError;
-use requests::{start::start, get::get};
+use requests::{start::start, device};
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 
@@ -23,9 +23,27 @@ enum Commands {
         /// id of the device
         id: String
     },
-    Get {
-        id: String
+    Device {
+        #[command(subcommand)]
+        devicecmd: DeviceCmd,
     }
+}
+
+#[derive(Subcommand)]
+enum DeviceCmd {
+    Add {
+        id: String,
+        mac: String,
+        broadcast_addr: String
+    },
+    Get {
+        id: String,
+    },
+    Edit {
+        id: String,
+        mac: String,
+        broadcast_addr: String
+    },
 }
 
 fn main() -> Result<(), CliError> {
@@ -35,8 +53,18 @@ fn main() -> Result<(), CliError> {
         Commands::Start { id } => {
             start(id)?;
         },
-        Commands::Get { id } => {
-            get(id)?;
+        Commands::Device { devicecmd } => {
+            match devicecmd {
+                DeviceCmd::Add { id, mac, broadcast_addr } => {
+                    device::put(id, mac, broadcast_addr)?;
+                },
+                DeviceCmd::Get { id } => {
+                    device::get(id)?;
+                },
+                DeviceCmd::Edit { id, mac, broadcast_addr } => {
+                    device::post(id, mac, broadcast_addr)?;
+                },
+            }
         }
     }
 
@@ -57,7 +85,14 @@ fn default_headers() -> Result<HeaderMap, CliError> {
     );
 
     Ok(map)
+}
 
+fn format_url(path: &str) -> Result<String, CliError> {
+    Ok(format!(
+        "{}/{}",
+        SETTINGS.get_string("server").map_err(CliError::Config)?,
+        path
+    ))
 }
 
 #[derive(Debug, Deserialize)]
