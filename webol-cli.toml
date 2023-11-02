@@ -1,2 +1,2 @@
-server = "http://localhost:7229"
+server = "192.168.178.28:7229"
 key = "aaa"
