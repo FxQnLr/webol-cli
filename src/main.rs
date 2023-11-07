@@ -1,8 +1,9 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Duration};
 
 use clap::{Parser, Subcommand};
 use config::SETTINGS;
 use error::CliError;
+use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use requests::{start::start, device};
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::Deserialize;
@@ -11,7 +12,15 @@ mod config;
 mod error;
 mod requests;
 
-/// webol http client
+static OVERVIEW_STYLE: &str = "{spinner:.green} {wide_msg}({elapsed})";
+static OVERVIEW_ERROR: &str = "✗ {wide_msg}({elapsed})";
+static OVERVIEW_DONE: &str = "✓ {wide_msg}({elapsed})";
+static DEFAULT_STYLE: &str = "  {spinner:.green} {wide_msg}";
+static DONE_STYLE: &str = "  ✓ {wide_msg}";
+static ERROR_STYLE: &str = "  ✗ {wide_msg}";
+static TICK_SPEED: u64 = 1000 / 16;
+
+/// webol client
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -101,6 +110,21 @@ fn format_url(path: &str, protocol: Protocols) -> Result<String, CliError> {
         SETTINGS.get_string("server").map_err(CliError::Config)?,
         path
     ))
+}
+
+fn add_pb(mp: &MultiProgress, template: &str, message: String) -> ProgressBar {
+    let pb = mp.add(ProgressBar::new(1));
+    pb.set_style(ProgressStyle::with_template(template).unwrap());
+    pb.enable_steady_tick(Duration::from_millis(TICK_SPEED));
+    pb.set_message(message);
+
+    pb
+}
+
+fn finish_pb(pb: ProgressBar, message: String, template: &str) {
+    pb.set_style(ProgressStyle::with_template(template).unwrap());
+    pb.finish_with_message(message);
+
 }
 
 enum Protocols {

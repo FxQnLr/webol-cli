@@ -1,8 +1,10 @@
 use crate::{error::CliError, default_headers, format_url, Protocols};
 
 pub async fn put(id: String, mac: String, broadcast_addr: String, ip: String) -> Result<(), CliError> {
+    let url = format_url("device", Protocols::Http)?;
+    println!("{}", url);
     let res = reqwest::Client::new()
-        .put(format_url("device", Protocols::Http)?)
+        .put(url)
         .headers(default_headers()?)
         .body(
             format!(
