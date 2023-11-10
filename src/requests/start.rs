@@ -1,5 +1,5 @@
 use futures_util::{StreamExt, SinkExt};
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -9,7 +9,7 @@ use crate::{error::CliError, default_headers, ErrorResponse, format_url, Protoco
 pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
 
     let send_start = MultiProgress::new();
-    let overview = add_pb(&send_start, OVERVIEW_STYLE, format!("start {}", id));
+    let overview = add_pb(&send_start, OVERVIEW_STYLE, format!(") start {}", id));
 
     // TODO: calculate average start-time on server
     let url = format_url("start", Protocols::Http)?;
@@ -38,7 +38,7 @@ pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
             }
 
             if ping {
-                let status = status_socket(body.uuid, &send_start).await?;
+                let status = status_socket(body.uuid, &send_start, &overview, id).await?;
                 if status {
                     finish_pb(overview, format!("successfully started {}", body.id), OVERVIEW_DONE);
                 } else {
@@ -59,7 +59,7 @@ pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn status_socket(uuid: String, pb: &MultiProgress) -> Result<bool, CliError> {
+async fn status_socket(uuid: String, pb: &MultiProgress, overview: &ProgressBar, id: String) -> Result<bool, CliError> {
     // TODO: Remove unwraps
     let ws_pb = add_pb(pb, DEFAULT_STYLE, "connect to websocket".to_string());
     let (mut ws_stream, _response) = connect_async(format_url("status", Protocols::Websocket)?)
@@ -68,6 +68,11 @@ async fn status_socket(uuid: String, pb: &MultiProgress) -> Result<bool, CliErro
     finish_pb(ws_pb, "connected to websocket".to_string(), DONE_STYLE);
     
     ws_stream.send(Message::Text(uuid.clone())).await.unwrap();
+    
+    // Get ETA
+    let eta_msg = ws_stream.next().await.unwrap().unwrap();
+    let eta = get_eta(eta_msg.into_text().unwrap(), uuid.clone())? + overview.elapsed().as_secs();
+    overview.set_message(format!("/{}) start {}", eta, id));
 
     let msg_pb = add_pb(pb, DEFAULT_STYLE, "await message".to_string());
     let msg = ws_stream.next().await.unwrap();
@@ -99,6 +104,12 @@ async fn status_socket(uuid: String, pb: &MultiProgress) -> Result<bool, CliErro
             }
         }
     }
+}
+
+fn get_eta(msg: String, uuid: String) -> Result<u64, CliError> {
+    let spl: Vec<&str> = msg.split('_').collect();
+    if (spl[0] != "eta") || (spl[2] != uuid) { return Err(CliError::WsResponse); };
+    Ok(u64::from_str_radix(spl[1], 10).map_err(CliError::Parse)?)
 }
 
 fn verify_response(res: String, org_uuid: String) -> Result<Verified, CliError> {

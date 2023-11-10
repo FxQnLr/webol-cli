@@ -1,6 +1,6 @@
 services:
   webol:
-    image: ghcr.io/fxqnlr/webol:dev-2
+    image: ghcr.io/fxqnlr/webol:dev-6
     container_name: webol
     restart: no
     depends_on:
