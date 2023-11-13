@@ -1,6 +1,7 @@
 use std::{fmt::Display, time::Duration};
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Command, CommandFactory, Subcommand};
+use clap_complete::{generate, Shell, Generator};
 use config::SETTINGS;
 use error::CliError;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
@@ -39,7 +40,10 @@ enum Commands {
     Device {
         #[command(subcommand)]
         devicecmd: DeviceCmd,
-    }
+    },
+    CliGen {
+        id: Shell,
+    },
 }
 
 #[derive(Subcommand)]
@@ -81,10 +85,19 @@ async fn main() -> Result<(), CliError> {
                     device::post(id, mac, broadcast_addr, ip).await?;
                 },
             }
+        },
+        Commands::CliGen { id } => {
+            eprintln!("Generating completion file for {id:?}...");
+            let mut cmd = Args::command();
+            print_completions(id, &mut cmd)
         }
     }
 
     Ok(())
+}
+
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
 }
 
 fn default_headers() -> Result<HeaderMap, CliError> {
