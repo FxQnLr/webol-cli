@@ -6,7 +6,10 @@ use clap_complete::{generate, Generator, Shell};
 use error::Error;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use requests::{device, start::start};
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::{
+    header::{HeaderMap, HeaderValue},
+    Response,
+};
 use serde::Deserialize;
 
 mod config;
@@ -66,7 +69,7 @@ enum DeviceCmd {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), anyhow::Error> {
     let config = Config::load()?;
 
     let cli = Args::parse();
@@ -112,24 +115,26 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
 
 fn default_headers(config: &Config) -> Result<HeaderMap, Error> {
     let mut map = HeaderMap::new();
-    map.append(
-        "Accept-Content",
-        HeaderValue::from_str("application/json")?
-    );
-    map.append(
-        "Content-Type",
-        HeaderValue::from_str("application/json")?
-    );
-    map.append(
-        "Authorization",
-        HeaderValue::from_str(&config.apikey)?
-    );
+    map.append("Accept-Content", HeaderValue::from_str("application/json")?);
+    map.append("Content-Type", HeaderValue::from_str("application/json")?);
+    map.append("Authorization", HeaderValue::from_str(&config.apikey)?);
 
     Ok(map)
 }
 
 fn format_url(config: &Config, path: &str, protocol: &Protocols) -> String {
     format!("{}://{}/{}", protocol, config.server, path)
+}
+
+async fn check_success(res: Response) -> Result<String, Error> {
+    let status = res.status();
+    if status.is_success() {
+        Ok(res.text().await?)
+    } else if status.as_u16() == 401 {
+        Err(Error::Authorization)
+    } else {
+        Err(Error::HttpStatus(status.as_u16()))
+    }
 }
 
 fn add_pb(mp: &MultiProgress, template: &str, message: String) -> ProgressBar {

@@ -1,4 +1,4 @@
-use crate::{config::Config, default_headers, error::Error, format_url, Protocols};
+use crate::{check_success, config::Config, default_headers, error::Error, format_url, Protocols};
 
 pub async fn put(
     config: &Config,
@@ -16,11 +16,10 @@ pub async fn put(
             r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,
         ))
         .send()
-        .await?
-        .text()
-        .await;
+        .await?;
 
-    println!("{res:?}");
+    let body = check_success(res).await?;
+    println!("{body}");
     Ok(())
 }
 
@@ -30,11 +29,10 @@ pub async fn get(config: &Config, id: String) -> Result<(), Error> {
         .headers(default_headers(config)?)
         .body(format!(r#"{{"id": "{id}"}}"#))
         .send()
-        .await?
-        .text()
-        .await;
+        .await?;
 
-    println!("{res:?}");
+    let body = check_success(res).await?;
+    println!("{body}");
     Ok(())
 }
 
@@ -52,10 +50,9 @@ pub async fn post(
             r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,
         ))
         .send()
-        .await?
-        .text()
-        .await;
+        .await?;
 
-    println!("{res:?}");
+    let body = check_success(res).await?;
+    println!("{body}");
     Ok(())
 }

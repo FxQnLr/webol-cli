@@ -27,8 +27,17 @@ pub enum Error {
     #[error("parse header: {source}")]
     InvalidHeaderValue {
         #[from]
-        source: InvalidHeaderValue
+        source: InvalidHeaderValue,
     },
-    #[error("ws")]
+    #[error("tungstenite: {source}")]
+    Tungstenite {
+        #[from]
+        source: tokio_tungstenite::tungstenite::Error,
+    },
+    #[error("faulty websocket response")]
     WsResponse,
+    #[error("authorization failed")]
+    Authorization,
+    #[error("Http error status: {0}")]
+    HttpStatus(u16),
 }

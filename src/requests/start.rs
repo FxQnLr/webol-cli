@@ -2,7 +2,10 @@ use futures_util::{SinkExt, StreamExt};
 use indicatif::{MultiProgress, ProgressBar};
 use reqwest::StatusCode;
 use serde::Deserialize;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{http::Request, Message},
+};
 
 use crate::{
     add_pb, config::Config, default_headers, error::Error, finish_pb, format_url, ErrorResponse,
@@ -66,17 +69,26 @@ async fn status_socket(
     id: String,
 ) -> Result<bool, Error> {
     let ws_pb = add_pb(pb, DEFAULT_STYLE, "connect to websocket".to_string());
-    let (mut ws_stream, _response) =
-        connect_async(format_url(config, "status", &Protocols::Websocket))
-            .await
-            .expect("Failed to connect");
+
+    let request = Request::builder()
+        .uri(format_url(config, "status", &Protocols::Websocket))
+        .header("Authorization", &config.apikey)
+        .header("sec-websocket-key", "")
+        .header("host", &config.server)
+        .header("upgrade", "websocket")
+        .header("connection", "upgrade")
+        .header("sec-websocket-version", 13)
+        .body(())
+        .unwrap();
+
+    let (mut ws_stream, _response) = connect_async(request).await?;
     finish_pb(&ws_pb, "connected to websocket".to_string(), DONE_STYLE);
 
     ws_stream.send(Message::Text(uuid.clone())).await.unwrap();
 
     // Get ETA
     let eta_msg = ws_stream.next().await.unwrap().unwrap();
-    let eta = get_eta(&eta_msg.into_text().unwrap(), &uuid)? + overview.elapsed().as_secs();
+    let eta = get_eta(&eta_msg.into_text().unwrap(), &uuid)?;
     overview.set_message(format!("/{eta}) start {id}"));
 
     let msg_pb = add_pb(pb, DEFAULT_STYLE, "await message".to_string());
