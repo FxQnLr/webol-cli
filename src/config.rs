@@ -1,19 +1,19 @@
-use config::Config;
-use once_cell::sync::Lazy;
+use serde::Deserialize;
 
-pub static SETTINGS: Lazy<Config> = Lazy::new(setup);
+#[derive(Deserialize)]
+pub struct Config {
+    pub apikey: String,
+    pub server: String,
+}
 
-fn setup() -> Config {
-    #[cfg(not(debug_assertions))]
-    let builder = Config::builder().add_source(config::File::with_name(
-        format!("{}/webol-cli.toml", dirs::config_dir().unwrap().to_string_lossy()).as_str(),
-    ));
+impl Config {
+    pub fn load() -> Result<Config, config::ConfigError> {
+        let builder = config::Config::builder()
+            .add_source(config::File::with_name("~/.config/webol-cli.toml"))
+            .add_source(config::File::with_name("webol-cli.toml"))
+            .add_source(config::Environment::with_prefix("WEBOL_CLI_").separator("_"))
+            .build()?;
 
-    #[cfg(debug_assertions)]
-    let builder = Config::builder().add_source(config::File::with_name("webol-cli.toml"));
-
-    builder
-        .add_source(config::Environment::with_prefix("WEBOL_CLI_").separator("_"))
-        .build()
-        .unwrap()
+        builder.try_deserialize()
+    }
 }

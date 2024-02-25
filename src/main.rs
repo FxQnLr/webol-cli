@@ -1,11 +1,11 @@
 use std::{fmt::Display, time::Duration};
 
-use clap::{Parser, Command, CommandFactory, Subcommand};
-use clap_complete::{generate, Shell, Generator};
-use config::SETTINGS;
+use crate::config::Config;
+use clap::{Command, CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Generator, Shell};
 use error::CliError;
-use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
-use requests::{start::start, device};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use requests::{device, start::start};
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::Deserialize;
 
@@ -35,7 +35,7 @@ enum Commands {
         /// id of the device
         id: String,
         #[arg(short, long)]
-        ping: Option<bool>
+        ping: Option<bool>,
     },
     Device {
         #[command(subcommand)]
@@ -52,7 +52,7 @@ enum DeviceCmd {
         id: String,
         mac: String,
         broadcast_addr: String,
-        ip: String
+        ip: String,
     },
     Get {
         id: String,
@@ -61,29 +61,39 @@ enum DeviceCmd {
         id: String,
         mac: String,
         broadcast_addr: String,
-        ip: String
+        ip: String,
     },
 }
 
 #[tokio::main]
 async fn main() -> Result<(), CliError> {
+    let config = Config::load().map_err(CliError::Config)?;
+
     let cli = Args::parse();
 
     match cli.commands {
         Commands::Start { id, ping } => {
-            start(id, ping.unwrap_or(true)).await?;
-        },
-        Commands::Device { devicecmd } => {
-            match devicecmd {
-                DeviceCmd::Add { id, mac, broadcast_addr, ip } => {
-                    device::put(id, mac, broadcast_addr, ip).await?;
-                },
-                DeviceCmd::Get { id } => {
-                    device::get(id).await?;
-                },
-                DeviceCmd::Edit { id, mac, broadcast_addr, ip } => {
-                    device::post(id, mac, broadcast_addr, ip).await?;
-                },
+            start(&config, id, ping.unwrap_or(true)).await?;
+        }
+        Commands::Device { devicecmd } => match devicecmd {
+            DeviceCmd::Add {
+                id,
+                mac,
+                broadcast_addr,
+                ip,
+            } => {
+                device::put(&config, id, mac, broadcast_addr, ip).await?;
+            }
+            DeviceCmd::Get { id } => {
+                device::get(&config, id).await?;
+            }
+            DeviceCmd::Edit {
+                id,
+                mac,
+                broadcast_addr,
+                ip,
+            } => {
+                device::post(&config, id, mac, broadcast_addr, ip).await?;
             }
         },
         Commands::CliGen { id } => {
@@ -100,29 +110,26 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
 }
 
-fn default_headers() -> Result<HeaderMap, CliError> {
+fn default_headers(config: &Config) -> Result<HeaderMap, CliError> {
     let mut map = HeaderMap::new();
-    map.append("Accept-Content", HeaderValue::from_str("application/json").unwrap());
-    map.append("Content-Type", HeaderValue::from_str("application/json").unwrap());
+    map.append(
+        "Accept-Content",
+        HeaderValue::from_str("application/json").unwrap(),
+    );
+    map.append(
+        "Content-Type",
+        HeaderValue::from_str("application/json").unwrap(),
+    );
     map.append(
         "Authorization",
-        HeaderValue::from_str(
-            SETTINGS.get_string("key")
-            .map_err(CliError::Config)?
-            .as_str()
-        ).unwrap()
+        HeaderValue::from_str(&config.apikey).unwrap(),
     );
 
     Ok(map)
 }
 
-fn format_url(path: &str, protocol: Protocols) -> Result<String, CliError> {
-    Ok(format!(
-        "{}://{}/{}",
-        protocol,
-        SETTINGS.get_string("server").map_err(CliError::Config)?,
-        path
-    ))
+fn format_url(config: &Config, path: &str, protocol: Protocols) -> Result<String, CliError> {
+    Ok(format!("{}://{}/{}", protocol, config.server, path))
 }
 
 fn add_pb(mp: &MultiProgress, template: &str, message: String) -> ProgressBar {
@@ -137,7 +144,6 @@ fn add_pb(mp: &MultiProgress, template: &str, message: String) -> ProgressBar {
 fn finish_pb(pb: ProgressBar, message: String, template: &str) {
     pb.set_style(ProgressStyle::with_template(template).unwrap());
     pb.finish_with_message(message);
-
 }
 
 enum Protocols {
@@ -149,12 +155,12 @@ impl Display for Protocols {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Http => f.write_str("http"),
-            Self::Websocket => f.write_str("ws")
+            Self::Websocket => f.write_str("ws"),
         }
     }
 }
 
 #[derive(Debug, Deserialize)]
 struct ErrorResponse {
-    error: String
+    error: String,
 }

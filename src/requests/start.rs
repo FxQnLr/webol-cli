@@ -1,25 +1,26 @@
-use futures_util::{StreamExt, SinkExt};
+use futures_util::{SinkExt, StreamExt};
 use indicatif::{MultiProgress, ProgressBar};
 use reqwest::StatusCode;
 use serde::Deserialize;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use crate::{error::CliError, default_headers, ErrorResponse, format_url, Protocols, OVERVIEW_STYLE, DEFAULT_STYLE, DONE_STYLE, finish_pb, ERROR_STYLE, OVERVIEW_ERROR, OVERVIEW_DONE, add_pb};
+use crate::{
+    add_pb, config::Config, default_headers, error::CliError, finish_pb, format_url, ErrorResponse,
+    Protocols, DEFAULT_STYLE, DONE_STYLE, ERROR_STYLE, OVERVIEW_DONE, OVERVIEW_ERROR,
+    OVERVIEW_STYLE,
+};
 
-pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
-
+pub async fn start(config: &Config, id: String, ping: bool) -> Result<(), CliError> {
     let send_start = MultiProgress::new();
     let overview = add_pb(&send_start, OVERVIEW_STYLE, format!(") start {}", id));
 
     // TODO: calculate average start-time on server
-    let url = format_url("start", Protocols::Http)?;
+    let url = format_url(config, "start", Protocols::Http)?;
     let connect = add_pb(&send_start, DEFAULT_STYLE, format!("connect to {}", url));
     let res = reqwest::Client::new()
         .post(url)
-        .headers(default_headers()?)
-        .body(
-            format!(r#"{{"id": "{}", "ping": {}}}"#, id, ping)
-        )
+        .headers(default_headers(config)?)
+        .body(format!(r#"{{"id": "{}", "ping": {}}}"#, id, ping))
         .send()
         .await
         .map_err(CliError::Reqwest)?;
@@ -29,7 +30,7 @@ pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
     match res.status() {
         StatusCode::OK => {
             let body = serde_json::from_str::<StartResponse>(
-                &res.text().await.map_err(CliError::Reqwest)?
+                &res.text().await.map_err(CliError::Reqwest)?,
             )
             .map_err(CliError::Serde)?;
 
@@ -38,17 +39,25 @@ pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
             }
 
             if ping {
-                let status = status_socket(body.uuid, &send_start, &overview, id).await?;
+                let status = status_socket(config, body.uuid, &send_start, &overview, id).await?;
                 if status {
-                    finish_pb(overview, format!("successfully started {}", body.id), OVERVIEW_DONE);
+                    finish_pb(
+                        overview,
+                        format!("successfully started {}", body.id),
+                        OVERVIEW_DONE,
+                    );
                 } else {
-                    finish_pb(overview, format!("error while starting {}", body.id), OVERVIEW_ERROR);
+                    finish_pb(
+                        overview,
+                        format!("error while starting {}", body.id),
+                        OVERVIEW_ERROR,
+                    );
                 }
             }
-        },
+        }
         _ => {
             let body = serde_json::from_str::<ErrorResponse>(
-                &res.text().await.map_err(CliError::Reqwest)?
+                &res.text().await.map_err(CliError::Reqwest)?,
             )
             .map_err(CliError::Serde)?;
 
@@ -59,16 +68,22 @@ pub async fn start(id: String, ping: bool) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn status_socket(uuid: String, pb: &MultiProgress, overview: &ProgressBar, id: String) -> Result<bool, CliError> {
-    // TODO: Remove unwraps
+async fn status_socket(
+    config: &Config,
+    uuid: String,
+    pb: &MultiProgress,
+    overview: &ProgressBar,
+    id: String,
+) -> Result<bool, CliError> {
     let ws_pb = add_pb(pb, DEFAULT_STYLE, "connect to websocket".to_string());
-    let (mut ws_stream, _response) = connect_async(format_url("status", Protocols::Websocket)?)
-        .await
-        .expect("Failed to connect");
+    let (mut ws_stream, _response) =
+        connect_async(format_url(config, "status", Protocols::Websocket)?)
+            .await
+            .expect("Failed to connect");
     finish_pb(ws_pb, "connected to websocket".to_string(), DONE_STYLE);
-    
+
     ws_stream.send(Message::Text(uuid.clone())).await.unwrap();
-    
+
     // Get ETA
     let eta_msg = ws_stream.next().await.unwrap().unwrap();
     let eta = get_eta(eta_msg.into_text().unwrap(), uuid.clone())? + overview.elapsed().as_secs();
@@ -86,29 +101,29 @@ async fn status_socket(uuid: String, pb: &MultiProgress, overview: &ProgressBar,
         Verified::WrongUuid => {
             finish_pb(v_pb, "returned wrong uuid".to_string(), ERROR_STYLE);
             Ok(false)
-        },
-        Verified::ResponseType(res_type) => {
-            match res_type {
-                ResponseType::Start => {
-                    finish_pb(v_pb, "device started".to_string(), DONE_STYLE);
-                    Ok(true)
-                },
-                ResponseType::Timeout => {
-                    finish_pb(v_pb, "ping timed out".to_string(), ERROR_STYLE);
-                    Ok(false)
-                },
-                ResponseType::NotFound => {
-                    finish_pb(v_pb, "unknown uuid".to_string(), ERROR_STYLE);
-                    Ok(false)
-                },
-            }
         }
+        Verified::ResponseType(res_type) => match res_type {
+            ResponseType::Start => {
+                finish_pb(v_pb, "device started".to_string(), DONE_STYLE);
+                Ok(true)
+            }
+            ResponseType::Timeout => {
+                finish_pb(v_pb, "ping timed out".to_string(), ERROR_STYLE);
+                Ok(false)
+            }
+            ResponseType::NotFound => {
+                finish_pb(v_pb, "unknown uuid".to_string(), ERROR_STYLE);
+                Ok(false)
+            }
+        },
     }
 }
 
 fn get_eta(msg: String, uuid: String) -> Result<u64, CliError> {
     let spl: Vec<&str> = msg.split('_').collect();
-    if (spl[0] != "eta") || (spl[2] != uuid) { return Err(CliError::WsResponse); };
+    if (spl[0] != "eta") || (spl[2] != uuid) {
+        return Err(CliError::WsResponse);
+    };
     Ok(u64::from_str_radix(spl[1], 10).map_err(CliError::Parse)?)
 }
 
@@ -116,9 +131,11 @@ fn verify_response(res: String, org_uuid: String) -> Result<Verified, CliError> 
     let spl: Vec<&str> = res.split('_').collect();
     let res_type = spl[0];
     let uuid = spl[1];
-    
-    if uuid != org_uuid { return Ok(Verified::WrongUuid) };
-    
+
+    if uuid != org_uuid {
+        return Ok(Verified::WrongUuid);
+    };
+
     Ok(Verified::ResponseType(ResponseType::from(res_type)?))
 }
 
@@ -131,7 +148,7 @@ struct StartResponse {
 
 enum Verified {
     ResponseType(ResponseType),
-    WrongUuid
+    WrongUuid,
 }
 
 enum ResponseType {
