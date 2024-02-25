@@ -1,4 +1,4 @@
-use crate::{config::Config, default_headers, error::CliError, format_url, Protocols};
+use crate::{config::Config, default_headers, error::Error, format_url, Protocols};
 
 pub async fn put(
     config: &Config,
@@ -6,38 +6,35 @@ pub async fn put(
     mac: String,
     broadcast_addr: String,
     ip: String,
-) -> Result<(), CliError> {
-    let url = format_url(config, "device", Protocols::Http)?;
-    println!("{}", url);
+) -> Result<(), Error> {
+    let url = format_url(config, "device", &Protocols::Http);
+    println!("{url}");
     let res = reqwest::Client::new()
         .put(url)
         .headers(default_headers(config)?)
         .body(format!(
-            r#"{{"id": "{}", "mac": "{}", "broadcast_addr": "{}", "ip": "{}"}}"#,
-            id, mac, broadcast_addr, ip
+            r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,
         ))
         .send()
-        .await
-        .map_err(CliError::Reqwest)?
+        .await?
         .text()
         .await;
 
-    println!("{:?}", res);
+    println!("{res:?}");
     Ok(())
 }
 
-pub async fn get(config: &Config, id: String) -> Result<(), CliError> {
+pub async fn get(config: &Config, id: String) -> Result<(), Error> {
     let res = reqwest::Client::new()
-        .get(format_url(config, "device", Protocols::Http)?)
+        .get(format_url(config, "device", &Protocols::Http))
         .headers(default_headers(config)?)
-        .body(format!(r#"{{"id": "{}"}}"#, id))
+        .body(format!(r#"{{"id": "{id}"}}"#))
         .send()
-        .await
-        .map_err(CliError::Reqwest)?
+        .await?
         .text()
         .await;
 
-    println!("{:?}", res);
+    println!("{res:?}");
     Ok(())
 }
 
@@ -47,20 +44,18 @@ pub async fn post(
     mac: String,
     broadcast_addr: String,
     ip: String,
-) -> Result<(), CliError> {
+) -> Result<(), Error> {
     let res = reqwest::Client::new()
-        .post(format_url(config, "device", Protocols::Http)?)
+        .post(format_url(config, "device", &Protocols::Http))
         .headers(default_headers(config)?)
         .body(format!(
-            r#"{{"id": "{}", "mac": "{}", "broadcast_addr": "{}", "ip": "{}"}}"#,
-            id, mac, broadcast_addr, ip
+            r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,
         ))
         .send()
-        .await
-        .map_err(CliError::Reqwest)?
+        .await?
         .text()
         .await;
 
-    println!("{:?}", res);
+    println!("{res:?}");
     Ok(())
 }

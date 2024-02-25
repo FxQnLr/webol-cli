@@ -3,7 +3,7 @@ use std::{fmt::Display, time::Duration};
 use crate::config::Config;
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
-use error::CliError;
+use error::Error;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use requests::{device, start::start};
 use reqwest::header::{HeaderMap, HeaderValue};
@@ -66,8 +66,8 @@ enum DeviceCmd {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), CliError> {
-    let config = Config::load().map_err(CliError::Config)?;
+async fn main() -> Result<(), Error> {
+    let config = Config::load()?;
 
     let cli = Args::parse();
 
@@ -99,7 +99,7 @@ async fn main() -> Result<(), CliError> {
         Commands::CliGen { id } => {
             eprintln!("Generating completion file for {id:?}...");
             let mut cmd = Args::command();
-            print_completions(id, &mut cmd)
+            print_completions(id, &mut cmd);
         }
     }
 
@@ -110,26 +110,26 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
 }
 
-fn default_headers(config: &Config) -> Result<HeaderMap, CliError> {
+fn default_headers(config: &Config) -> Result<HeaderMap, Error> {
     let mut map = HeaderMap::new();
     map.append(
         "Accept-Content",
-        HeaderValue::from_str("application/json").unwrap(),
+        HeaderValue::from_str("application/json")?
     );
     map.append(
         "Content-Type",
-        HeaderValue::from_str("application/json").unwrap(),
+        HeaderValue::from_str("application/json")?
     );
     map.append(
         "Authorization",
-        HeaderValue::from_str(&config.apikey).unwrap(),
+        HeaderValue::from_str(&config.apikey)?
     );
 
     Ok(map)
 }
 
-fn format_url(config: &Config, path: &str, protocol: Protocols) -> Result<String, CliError> {
-    Ok(format!("{}://{}/{}", protocol, config.server, path))
+fn format_url(config: &Config, path: &str, protocol: &Protocols) -> String {
+    format!("{}://{}/{}", protocol, config.server, path)
 }
 
 fn add_pb(mp: &MultiProgress, template: &str, message: String) -> ProgressBar {
@@ -141,7 +141,7 @@ fn add_pb(mp: &MultiProgress, template: &str, message: String) -> ProgressBar {
     pb
 }
 
-fn finish_pb(pb: ProgressBar, message: String, template: &str) {
+fn finish_pb(pb: &ProgressBar, message: String, template: &str) {
     pb.set_style(ProgressStyle::with_template(template).unwrap());
     pb.finish_with_message(message);
 }
