@@ -121,12 +121,18 @@ async fn status_socket(
     }
 }
 
-fn get_eta(msg: &str, uuid: &str) -> Result<u64, Error> {
+fn get_eta(msg: &str, uuid: &str) -> Result<String, Error> {
     let spl: Vec<&str> = msg.split('_').collect();
     if (spl[0] != "eta") || (spl[2] != uuid) {
         return Err(Error::WsResponse);
     };
-    Ok(spl[1].parse()?)
+    let input: u64 = spl[1].parse()?;
+
+    let sec = input % 60;
+    let min = (input / 60) % 60;
+    let hou = (input / (60 * 60)) % 60;
+
+    Ok(format!("{hou:0>2}:{min:0>2}:{sec:0>2}"))
 }
 
 fn verify_response(res: &str, org_uuid: &str) -> Result<Verified, Error> {

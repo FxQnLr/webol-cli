@@ -16,9 +16,9 @@ mod config;
 mod error;
 mod requests;
 
-static OVERVIEW_STYLE: &str = "{spinner:.green} ({elapsed}{wide_msg}";
-static OVERVIEW_ERROR: &str = "✗ ({elapsed}) {wide_msg}";
-static OVERVIEW_DONE: &str = "✓ ({elapsed}) {wide_msg}";
+static OVERVIEW_STYLE: &str = "{spinner:.green} ({elapsed_precise}{wide_msg}";
+static OVERVIEW_ERROR: &str = "✗ ({elapsed_precise}) {wide_msg}";
+static OVERVIEW_DONE: &str = "✓ ({elapsed_precise}) {wide_msg}";
 static DEFAULT_STYLE: &str = "  {spinner:.green} {wide_msg}";
 static DONE_STYLE: &str = "  ✓ {wide_msg}";
 static ERROR_STYLE: &str = "  ✗ {wide_msg}";

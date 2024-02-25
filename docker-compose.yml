@@ -9,7 +9,7 @@ services:
       - RUST_LOG=info,webol=trace
       - WEBOL_DATABASE_URL=postgres://postgres:postgres@localhost:5432/webol
       - WEBOL_APIKEY=dev
-      - WEBOL_SERVERADDR=127.0.0.1:7229
+      - WEBOL_SERVERADDR=0.0.0.0:7229
     network_mode: host
 
   db:
