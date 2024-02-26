@@ -1,66 +1,58 @@
-use crate::{error::CliError, default_headers, format_url, Protocols};
+use crate::{check_success, config::Config, default_headers, error::Error, format_url, Protocols};
 
-pub async fn put(id: String, mac: String, broadcast_addr: String, ip: String) -> Result<(), CliError> {
-    let url = format_url("device", Protocols::Http)?;
-    println!("{}", url);
+pub async fn put(
+    config: &Config,
+    id: String,
+    mac: String,
+    broadcast_addr: String,
+    ip: String,
+) -> Result<(), Error> {
+    let url = format_url(config, "device", &Protocols::Http);
+    println!("{url}");
     let res = reqwest::Client::new()
         .put(url)
-        .headers(default_headers()?)
-        .body(
-            format!(
-                r#"{{"id": "{}", "mac": "{}", "broadcast_addr": "{}", "ip": "{}"}}"#,
-                id,
-                mac,
-                broadcast_addr,
-                ip
-            )
-        )
+        .headers(default_headers(config)?)
+        .body(format!(
+            r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,
+        ))
         .send()
-        .await
-        .map_err(CliError::Reqwest)?
-        .text()
-        .await;
+        .await?;
 
-    println!("{:?}", res);
+    let body = check_success(res).await?;
+    println!("{body}");
     Ok(())
 }
 
-pub async fn get(id: String) -> Result<(), CliError> {
+pub async fn get(config: &Config, id: String) -> Result<(), Error> {
     let res = reqwest::Client::new()
-        .get(format_url("device", Protocols::Http)?)
-        .headers(default_headers()?)
-        .body(
-            format!(r#"{{"id": "{}"}}"#, id)
-        )
+        .get(format_url(config, "device", &Protocols::Http))
+        .headers(default_headers(config)?)
+        .body(format!(r#"{{"id": "{id}"}}"#))
         .send()
-        .await
-        .map_err(CliError::Reqwest)?
-        .text()
-        .await;
+        .await?;
 
-    println!("{:?}", res);
+    let body = check_success(res).await?;
+    println!("{body}");
     Ok(())
 }
 
-pub async fn post(id: String, mac: String, broadcast_addr: String, ip: String) -> Result<(), CliError> {
+pub async fn post(
+    config: &Config,
+    id: String,
+    mac: String,
+    broadcast_addr: String,
+    ip: String,
+) -> Result<(), Error> {
     let res = reqwest::Client::new()
-        .post(format_url("device", Protocols::Http)?)
-        .headers(default_headers()?)
-        .body(
-            format!(
-                r#"{{"id": "{}", "mac": "{}", "broadcast_addr": "{}", "ip": "{}"}}"#,
-                id,
-                mac,
-                broadcast_addr,
-                ip
-            )
-        )
+        .post(format_url(config, "device", &Protocols::Http))
+        .headers(default_headers(config)?)
+        .body(format!(
+            r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,
+        ))
         .send()
-        .await
-        .map_err(CliError::Reqwest)?
-        .text()
-        .await;
+        .await?;
 
-    println!("{:?}", res);
+    let body = check_success(res).await?;
+    println!("{body}");
     Ok(())
 }
