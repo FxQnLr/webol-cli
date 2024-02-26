@@ -8,12 +8,23 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Result<Config, config::ConfigError> {
-        let builder = config::Config::builder()
-            .add_source(config::File::with_name("~/.config/webol-cli").required(false))
+        let config_dir = dirs::config_dir();
+
+        let builder = config::Config::builder();
+
+        let builder = if let Some(conf) = config_dir {
+            let dir = conf.to_string_lossy();
+            builder.add_source(config::File::with_name(format!("{dir}/webol-cli").as_str()).required(false))
+        } else {
+            println!("!No config dir found");
+            builder
+        };
+
+        let build = builder
             .add_source(config::File::with_name("webol-cli").required(false))
-            .add_source(config::Environment::with_prefix("WEBOL_CLI_").separator("_"))
+            .add_source(config::Environment::with_prefix("WEBOL_CLI").separator("_"))
             .build()?;
 
-        builder.try_deserialize()
+        build.try_deserialize()
     }
 }
