@@ -1,0 +1,21 @@
+name: check
+
+on: [ pull_request, push ]
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: run sccache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
+      - uses: actions/checkout@v4
+
+      - run: cargo check --release
+      - run: cargo clippy --release
