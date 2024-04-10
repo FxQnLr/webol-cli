@@ -17,12 +17,12 @@ pub async fn start(config: &Config, id: String, ping: bool) -> Result<(), Error>
     let send_start = MultiProgress::new();
     let overview = add_pb(&send_start, OVERVIEW_STYLE, format!(") start {id}"));
 
-    let url = format_url(config, "start", &Protocols::Http);
+    let url = format_url(config, "start", &Protocols::Http, Some(&id));
     let connect = add_pb(&send_start, DEFAULT_STYLE, format!("connect to {url}"));
     let res = reqwest::Client::new()
         .post(url)
         .headers(default_headers(config)?)
-        .body(format!(r#"{{"id": "{id}", "ping": {ping}}}"#))
+        .body(format!(r#"{{"ping": {ping}}}"#))
         .send()
         .await?;
     finish_pb(&connect, "connected, got response".to_string(), DONE_STYLE);
@@ -71,8 +71,8 @@ async fn status_socket(
     let ws_pb = add_pb(pb, DEFAULT_STYLE, "connect to websocket".to_string());
 
     let request = Request::builder()
-        .uri(format_url(config, "status", &Protocols::Websocket))
-        .header("Authorization", &config.apikey)
+        .uri(format_url(config, "status", &Protocols::Websocket, None))
+        .header("Authorization", &config.auth.secret)
         .header("sec-websocket-key", "")
         .header("host", &config.server)
         .header("upgrade", "websocket")

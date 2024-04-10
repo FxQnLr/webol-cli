@@ -3,6 +3,7 @@ use std::{fmt::Display, time::Duration};
 use crate::config::Config;
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
+use config::Method;
 use error::Error;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use requests::{device, start::start};
@@ -117,13 +118,21 @@ fn default_headers(config: &Config) -> Result<HeaderMap, Error> {
     let mut map = HeaderMap::new();
     map.append("Accept-Content", HeaderValue::from_str("application/json")?);
     map.append("Content-Type", HeaderValue::from_str("application/json")?);
-    map.append("Authorization", HeaderValue::from_str(&config.apikey)?);
+    if config.auth.method != Method::None {
+        map.append("Authorization", HeaderValue::from_str(&config.auth.secret)?);
+
+    }
 
     Ok(map)
 }
 
-fn format_url(config: &Config, path: &str, protocol: &Protocols) -> String {
-    format!("{}://{}/{}", protocol, config.server, path)
+fn format_url(config: &Config, path: &str, protocol: &Protocols, id: Option<&str>) -> String {
+    if let Some(id) = id {
+        format!("{}://{}/{}/{}", protocol, config.server, path, id)
+
+    } else {
+        format!("{}://{}/{}", protocol, config.server, path)
+    }
 }
 
 async fn check_success(res: Response) -> Result<String, Error> {

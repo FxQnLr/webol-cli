@@ -2,8 +2,20 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Config {
-    pub apikey: String,
     pub server: String,
+    pub auth: Auth,
+}
+
+#[derive(Deserialize)]
+pub struct Auth {
+    pub method: Method,
+    pub secret: String,
+}
+
+#[derive(PartialEq, Eq, Deserialize)]
+pub enum Method {
+    None,
+    Key,
 }
 
 impl Config {
@@ -12,9 +24,15 @@ impl Config {
 
         let builder = config::Config::builder();
 
+        let builder = builder
+            .set_default("auth.method", "none")?
+            .set_default("auth.secret", "")?;
+
         let builder = if let Some(conf) = config_dir {
             let dir = conf.to_string_lossy();
-            builder.add_source(config::File::with_name(format!("{dir}/webol-cli").as_str()).required(false))
+            builder.add_source(
+                config::File::with_name(format!("{dir}/webol-cli").as_str()).required(false),
+            )
         } else {
             println!("!No config dir found");
             builder
