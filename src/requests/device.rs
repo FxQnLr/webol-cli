@@ -7,7 +7,7 @@ pub async fn put(
     broadcast_addr: String,
     ip: String,
 ) -> Result<(), Error> {
-    let url = format_url(config, "device", &Protocols::Http);
+    let url = format_url(config, "device", &Protocols::Http, None);
     println!("{url}");
     let res = reqwest::Client::new()
         .put(url)
@@ -25,9 +25,8 @@ pub async fn put(
 
 pub async fn get(config: &Config, id: String) -> Result<(), Error> {
     let res = reqwest::Client::new()
-        .get(format_url(config, "device", &Protocols::Http))
+        .get(format_url(config, "device", &Protocols::Http, Some(&id)))
         .headers(default_headers(config)?)
-        .body(format!(r#"{{"id": "{id}"}}"#))
         .send()
         .await?;
 
@@ -44,7 +43,7 @@ pub async fn post(
     ip: String,
 ) -> Result<(), Error> {
     let res = reqwest::Client::new()
-        .post(format_url(config, "device", &Protocols::Http))
+        .post(format_url(config, "device", &Protocols::Http, None))
         .headers(default_headers(config)?)
         .body(format!(
             r#"{{"id": "{id}", "mac": "{mac}", "broadcast_addr": "{broadcast_addr}", "ip": "{ip}"}}"#,

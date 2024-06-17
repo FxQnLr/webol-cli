@@ -1,3 +1,4 @@
 /target
 /postgres-data
 webol-cli.toml
+/devices
