@@ -1,6 +1,6 @@
 services:
   webol:
-    image: webol-pc:2
+    image: webol:4
     container_name: webol-cli-server
     restart: no
     environment:
