@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::cli::Args;
+
 #[derive(Deserialize)]
 pub struct Config {
     pub server: String,
@@ -44,5 +46,15 @@ impl Config {
             .build()?;
 
         build.try_deserialize()
+    }
+
+    pub fn cli_override(&mut self, cli: &Args) -> &Self {
+        if let Some(server) = cli.server.to_owned() {
+            self.server = server
+        }
+        if let Some(secret) = cli.secret.to_owned() {
+            self.auth.secret = secret
+        }
+        self
     }
 }

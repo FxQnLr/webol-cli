@@ -1,8 +1,8 @@
 use std::{fmt::Display, time::Duration};
 
-use crate::config::Config;
-use clap::{Command, CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Generator, Shell};
+use crate::{cli::print_completions, config::Config};
+use clap::{CommandFactory, Parser};
+use cli::{Args, Commands, DeviceCmd};
 use config::Method;
 use error::Error;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -13,6 +13,7 @@ use reqwest::{
 };
 use serde::Deserialize;
 
+mod cli;
 mod config;
 mod error;
 mod requests;
@@ -25,55 +26,13 @@ static DONE_STYLE: &str = "  ✓ {wide_msg}";
 static ERROR_STYLE: &str = "  ✗ {wide_msg}";
 static TICK_SPEED: u64 = 1000 / 16;
 
-/// webol client
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[command(subcommand)]
-    commands: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Start {
-        /// id of the device
-        id: String,
-        #[arg(short, long)]
-        ping: Option<bool>,
-    },
-    Device {
-        #[command(subcommand)]
-        devicecmd: DeviceCmd,
-    },
-    CliGen {
-        id: Shell,
-    },
-}
-
-#[derive(Subcommand)]
-enum DeviceCmd {
-    Add {
-        id: String,
-        mac: String,
-        broadcast_addr: String,
-        ip: String,
-    },
-    Get {
-        id: String,
-    },
-    Edit {
-        id: String,
-        mac: String,
-        broadcast_addr: String,
-        ip: String,
-    },
-}
-
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let config = Config::load()?;
+    let mut config = Config::load()?;
 
     let cli = Args::parse();
+
+    config.cli_override(&cli);
 
     match cli.commands {
         Commands::Start { id, ping } => {
@@ -110,17 +69,12 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-    generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
-}
-
 fn default_headers(config: &Config) -> Result<HeaderMap, Error> {
     let mut map = HeaderMap::new();
     map.append("Accept-Content", HeaderValue::from_str("application/json")?);
     map.append("Content-Type", HeaderValue::from_str("application/json")?);
     if config.auth.method != Method::None {
         map.append("Authorization", HeaderValue::from_str(&config.auth.secret)?);
-
     }
 
     Ok(map)
@@ -129,7 +83,6 @@ fn default_headers(config: &Config) -> Result<HeaderMap, Error> {
 fn format_url(config: &Config, path: &str, protocol: &Protocols, id: Option<&str>) -> String {
     if let Some(id) = id {
         format!("{}://{}/{}/{}", protocol, config.server, path, id)
-
     } else {
         format!("{}://{}/{}", protocol, config.server, path)
     }
